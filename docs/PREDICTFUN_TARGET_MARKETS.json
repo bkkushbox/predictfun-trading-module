@@ -1,0 +1,62 @@
+{
+  "MetaMask": {
+    "categorySlug": "will-metamask-launch-a-token-in-2025",
+    "source": "category",
+    "markets": [
+      {
+        "id": 928,
+        "title": "June 30, 2026",
+        "question": "Will MetaMask launch a token by June 30, 2026?",
+        "kind": "date-launch"
+      },
+      {
+        "id": 929,
+        "title": "September 30, 2026",
+        "question": "Will MetaMask launch a token by September 30, 2026?",
+        "kind": "date-launch"
+      }
+    ]
+  },
+  "Base": {
+    "categorySlug": "will-base-launch-a-token-in-2026",
+    "source": "category",
+    "markets": [
+      {
+        "id": 934,
+        "title": "June 30, 2026",
+        "question": "Will Base launch a token by June 30, 2026?",
+        "kind": "date-launch"
+      },
+      {
+        "id": 933,
+        "title": "December 31, 2026",
+        "question": "Will Base launch a token by December 31, 2026?",
+        "kind": "date-launch"
+      }
+    ]
+  },
+  "OpenSea": {
+    "categorySlug": "will-opensea-launch-a-token-by-142",
+    "source": "category",
+    "markets": [
+      {
+        "id": 5121,
+        "title": "June 30, 2026",
+        "question": "Will OpenSea launch a token by June 30, 2026?",
+        "kind": "date-launch"
+      },
+      {
+        "id": 5124,
+        "title": "September 30, 2026",
+        "question": "Will OpenSea launch a token by September 30, 2026?",
+        "kind": "date-launch"
+      },
+      {
+        "id": 5122,
+        "title": "December 31, 2026",
+        "question": "Will OpenSea launch a token by December 31, 2026?",
+        "kind": "date-launch"
+      }
+    ]
+  }
+}
