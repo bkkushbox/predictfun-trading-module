@@ -1,71 +1,85 @@
 # PredictFun Trading Module
 
-PredictFun Trading Module is a semi-automatic trading workflow for PredictFun with strict user confirmation for all trading actions. The module monitors private orders, handles pause logic after a fill, tracks sell orders, places and replaces buy orders, and keeps notifications short and operational.
+A semi-automatic PredictFun trading module with private order monitoring, `SELL_HOLD_MODE`, confirmation-gated order placement, confirmation-gated replace flow, and operational notifications in a fixed format.
 
-## What the module does
+## What this repository gives you
 
-The module monitors private open orders and market state, detects fills, enters `SELL_HOLD_MODE`, watches the active sell order, and waits for user instructions after the sell is no longer active. It can place `Yes + No` buy orders, propose order replacement when market conditions move, execute replacements only after explicit user confirmation, and cancel one or all buy orders through the correct private API flow.
+This repository contains a working operational module for PredictFun trading workflows. It is designed for an operator who wants monitoring and execution help without giving full autonomy to the bot. The module watches private open orders, reacts correctly after a fill, tracks the active sell order, places fresh `Yes + No` buy orders after explicit confirmation, proposes replacements when prices move, and executes replacements only after the user confirms.
 
-## Confirmed working behaviors
+## Core principles
 
-This module has been confirmed in live tests for the following flows:
+- Monitoring can run automatically.
+- Trading actions stay confirmation-gated.
+- After a fill, the module enters `SELL_HOLD_MODE`.
+- In `SELL_HOLD_MODE`, the module sends one pause notification and then stays quiet.
+- Sell orders are monitored silently until their status changes.
+- Buy-order placement, replacement, and cancel-all require explicit user approval.
 
-- placing a single buy order;
-- placing `Yes + No` buy orders;
-- replacing `Yes + No` orders after explicit confirmation;
-- cancelling test buy orders;
-- keeping the active sell order untouched during buy-order cleanup;
-- using the correct cancel flow through `POST /v1/orders/remove`.
+## Confirmed in live tests
 
-## Core rules
+The following behaviors have already been confirmed in production tests:
 
-All trading actions are confirmation-gated. The module may monitor, calculate, and notify without confirmation, but it must not place, replace, or cancel trading orders without explicit user approval.
+- place one buy order;
+- place `Yes + No` buy orders;
+- replace `Yes + No` after explicit confirmation;
+- cancel test buy orders;
+- keep the active sell order untouched during buy cleanup;
+- use the correct private cancel flow through `POST /v1/orders/remove`.
 
 ## Main runtime flow
 
-### Normal buy mode
+### 1. Normal buy mode
 
-The private summary checks market state and private open orders. The trigger check runs on schedule and decides whether a replacement is needed. If the existing buy orders are already aligned with the target rules, the module returns `NO_CHANGES`. If a replacement is needed, the module sends a short proposal and waits for user confirmation before executing it.
+The module monitors market state and private open orders. If current orders still match the target rules, it returns `NO_CHANGES`. If a replacement is needed, it sends a proposal and waits for explicit confirmation before executing it.
 
-### Fill happened
+### 2. After a fill
 
-After a buy order is filled, the module enters `SELL_HOLD_MODE`. It sends one pause notification and then stays quiet instead of repeating the same message every hour.
+The module enters `SELL_HOLD_MODE` and sends one pause notification. After that, it does not spam repeated hourly messages.
 
-### Sell order active
+### 3. Sell order active
 
-When the user places a sell order, the module detects it in private open orders and sends a sell message in the fixed format. After that, it monitors the order quietly.
+When the user places a sell order, the module detects it and sends a sell notification in a fixed operational format. Then it continues to monitor silently.
 
-### Sell order no longer active
+### 4. Sell order no longer active
 
-When the sell order disappears from open orders, the module sends a short status update and waits for one of two user commands:
+When the sell order disappears from open orders, the module sends a short status message and waits for one of two user commands:
 - `выстави сам`
 - `ордера выставил сам`
 
-If the user says `выстави сам`, the module places fresh `Yes + No` buy orders according to the configured rules. If the user says `ордера выставил сам`, the module scans the already placed buy orders and resumes monitoring and replace proposals.
+### 5. Replace flow
+
+If the user wants the module to manage the buy side, the module can place fresh `Yes + No` buy orders. If the market moves, it builds a replace plan, sends a proposal, and executes the replace only after confirmation.
 
 ## Repository structure
 
-- `docs/` – architecture, operations, implementation stages, target markets
-- `scripts/` – auth, monitoring, place, replace, cancel, execution, message senders
-- `examples/` – reserved for public examples and sample payloads
+```text
+predictfun-trading-module/
+  README.md
+  QUICKSTART.md
+  SECURITY.md
+  PUBLISHING_NOTES.md
+  docs/
+  examples/
+  scripts/
+```
 
-## Files to read first
+## Read these files first
 
-- `docs/PREDICTFUN_OPERATIONS.md`
-- `docs/PREDICTFUN_ARCHITECTURE.md`
-- `QUICKSTART.md`
-- `SECURITY.md`
-- `examples/predictfun.env.example`
-- `examples/runtime-layout.md`
+- `QUICKSTART.md` – how to get running quickly
+- `SECURITY.md` – what must stay private
+- `docs/PREDICTFUN_OPERATIONS.md` – full runtime logic and output behavior
+- `docs/PREDICTFUN_ARCHITECTURE.md` – architecture and module layers
+- `examples/predictfun.env.example` – env template
+- `examples/runtime-layout.md` – suggested local folder layout
 
 ## Important technical note
 
-The correct cancel flow for the Predict account is:
+The correct cancel path for the Predict account is:
 
 - `POST /v1/orders/remove`
 
-Do not assume SDK `cancelOrders()` matches the real UX or production workflow.
+Do not assume SDK `cancelOrders()` matches the real production UX.
 
 ## Status
 
-This repository is designed to be publish-ready after secret cleanup and per-user configuration replacement. All runtime credentials must be supplied by the operator and are not included in the repository.
+This repository is publish-ready as a sanitized public package. Real credentials, live environment files, JWT tokens, cookies, and operational secrets are intentionally excluded.
