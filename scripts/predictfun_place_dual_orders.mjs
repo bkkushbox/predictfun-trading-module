@@ -32,8 +32,8 @@ const createOne = async (ob, headers, market, sideName, tokenId, target, budget)
   const quantityWei = BigInt(Math.round(quantity * 1e18));
   const amounts = ob.getLimitOrderAmounts({side, pricePerShareWei, quantityWei});
   const order = ob.buildOrder('LIMIT', {
-    maker: vals.PREDICTFUN_ACCOUNT_ADDRESS,
-    signer: vals.PREDICTFUN_ACCOUNT_ADDRESS,
+    maker: accountAddress,
+    signer: accountAddress,
     side,
     tokenId: String(tokenId),
     makerAmount: amounts.makerAmount,
@@ -52,12 +52,14 @@ const createOne = async (ob, headers, market, sideName, tokenId, target, budget)
   return {side: sideName, target, quantity, id: createRes?.data?.id || null};
 };
 const main = async () => {
-  const signer = new Wallet(vals.PREDICTFUN_PRIVY_PRIVATE_KEY);
-  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: vals.PREDICTFUN_ACCOUNT_ADDRESS});
+  const privateKey = vals.PREDICTFUN_PRIVY_PRIVATE_KEY || vals.PREDICTFUN_PRIVATE_KEY;
+  const accountAddress = vals.PREDICTFUN_ACCOUNT_ADDRESS || vals.PREDICTFUN_WALLET_ADDRESS;
+  const signer = new Wallet(privateKey);
+  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: accountAddress});
   await ob.setApprovals();
   const msgRes = await fetchJson('https://api.predict.fun/v1/auth/message', {headers: {'x-api-key': vals.PREDICTFUN_API_KEY}});
   const signature = await ob.signPredictAccountMessage(msgRes.data.message);
-  const jwtRes = await fetchJson('https://api.predict.fun/v1/auth', {method:'POST', headers:{'Content-Type':'application/json','x-api-key':vals.PREDICTFUN_API_KEY}, body: JSON.stringify({signer: vals.PREDICTFUN_ACCOUNT_ADDRESS, message: msgRes.data.message, signature})});
+  const jwtRes = await fetchJson('https://api.predict.fun/v1/auth', {method:'POST', headers:{'Content-Type':'application/json','x-api-key':vals.PREDICTFUN_API_KEY}, body: JSON.stringify({signer: accountAddress, message: msgRes.data.message, signature})});
   const jwt = jwtRes.data.token;
   const privHeaders = {'Authorization': `Bearer ${jwt}`, 'x-api-key': vals.PREDICTFUN_API_KEY, 'Content-Type':'application/json', 'User-Agent':'Mozilla/5.0'};
   const pubHeaders = {'x-api-key': vals.PREDICTFUN_API_KEY, 'User-Agent':'Mozilla/5.0'};

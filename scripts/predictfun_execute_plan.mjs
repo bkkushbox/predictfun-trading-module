@@ -34,8 +34,10 @@ const main = async () => {
   const vals = loadEnv(envPath);
   const payload = JSON.parse(fs.readFileSync(planPath, 'utf8'));
   const plan = payload.plan || [];
-  const signer = new Wallet(vals.PREDICTFUN_PRIVY_PRIVATE_KEY);
-  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: vals.PREDICTFUN_ACCOUNT_ADDRESS});
+  const privateKey = vals.PREDICTFUN_PRIVY_PRIVATE_KEY || vals.PREDICTFUN_PRIVATE_KEY;
+  const accountAddress = vals.PREDICTFUN_ACCOUNT_ADDRESS || vals.PREDICTFUN_WALLET_ADDRESS;
+  const signer = new Wallet(privateKey);
+  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: accountAddress});
 
   const msgRes = await fetchJson('https://api.predict.fun/v1/auth/message', {
     headers: {'x-api-key': vals.PREDICTFUN_API_KEY},
@@ -45,7 +47,7 @@ const main = async () => {
   const jwtRes = await fetchJson('https://api.predict.fun/v1/auth', {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'x-api-key': vals.PREDICTFUN_API_KEY},
-    body: JSON.stringify({signer: vals.PREDICTFUN_ACCOUNT_ADDRESS, message, signature}),
+    body: JSON.stringify({signer: accountAddress, message, signature}),
   });
   const jwt = jwtRes?.data?.token;
   const privHeaders = {
@@ -85,8 +87,8 @@ const main = async () => {
       const amounts = ob.getLimitOrderAmounts({side, pricePerShareWei, quantityWei});
       const feeRateBps = Number(market.feeRateBps || 0);
       const order = ob.buildOrder('LIMIT', {
-        maker: vals.PREDICTFUN_ACCOUNT_ADDRESS,
-        signer: vals.PREDICTFUN_ACCOUNT_ADDRESS,
+        maker: accountAddress,
+        signer: accountAddress,
         side,
         tokenId: String(act.tokenId),
         makerAmount: amounts.makerAmount,

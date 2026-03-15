@@ -6,188 +6,378 @@
 
 ## English
 
-A semi-automatic trading module for PredictFun with private order monitoring, `SELL_HOLD_MODE`, confirmation-gated execution, and fixed operational notifications.
+Semi-automatic PredictFun trading module with confirmation-gated execution, hourly monitoring, 10-minute trigger checks, sell tracking, and fixed operational notifications.
 
-### What this repository is
+### What this repository contains
 
-This repository is a public-ready version of a real operational PredictFun trading workflow. It is built for a user who wants automation where it is useful, but does not want to give the bot full freedom over trading actions.
+This repository is a public-ready version of a real PredictFun operational workflow.
+
+It is built for a user who wants useful automation, but does not want to give the bot uncontrolled trading power.
 
 The module can:
+- place buy orders for prepared markets;
 - monitor private open orders;
-- detect fills and switch into `SELL_HOLD_MODE`;
-- stay quiet after the pause notification instead of spamming;
-- track the active sell order;
-- prepare fresh `Yes + No` buy orders;
-- suggest replacements when the market moves;
-- execute placement or replacement only after explicit confirmation.
+- send hourly full reports;
+- run 10-minute trigger checks for urgent changes;
+- suggest replacements when prices move;
+- ask for confirmation before replacement;
+- switch into `SELL_HOLD_MODE` after a filled buy;
+- track active sell orders;
+- notify when a sale is completed;
+- restart the cycle after user confirmation.
 
-### Core principles
+### Default markets included
 
-- Monitoring can run automatically.
-- Trading actions stay confirmation-gated.
-- Buy placement, replace flow, and cleanup require explicit approval.
-- After a fill, the module pauses correctly and avoids noisy alerts.
-- The live sell order is preserved during buy-side cleanup.
+The repository already includes a prepared default market set:
+- OpenSea
+- Base
+- MetaMask
 
-### Confirmed in live tests
+The user can start with this prepared set and add custom markets later.
 
-The following behaviors were confirmed in production-style tests:
-- place one buy order;
-- place `Yes + No` buy orders;
-- replace `Yes + No` after explicit confirmation;
-- cancel test buy orders;
-- keep the active sell order untouched during cleanup;
-- use the correct private cancel flow through `POST /v1/orders/remove`.
+See: `docs/PREDICTFUN_TARGET_MARKETS.json`
 
-### Main runtime flow
+### Required setup
 
-#### 1. Normal buy mode
+The user must add three values to a local env file:
 
-The module monitors market state and private open orders. If current orders still match the target rules, it returns `NO_CHANGES`. If a replacement is needed, it sends a proposal and waits for explicit confirmation before executing it.
-
-#### 2. After a fill
-
-The module enters `SELL_HOLD_MODE` and sends one pause notification. After that, it stays quiet instead of repeating hourly noise.
-
-#### 3. Sell order active
-
-When the user places a sell order, the module detects it and sends a sell notification in a fixed operational format. Then it continues to monitor silently.
-
-#### 4. Sell order no longer active
-
-When the sell order disappears from open orders, the module sends a short status message and waits for one of two commands:
-- `выстави сам`
-- `ордера выставил сам`
-
-#### 5. Replace flow
-
-If the user wants the module to manage the buy side, it can place fresh `Yes + No` buy orders. If the market moves, it builds a replace plan, sends a proposal, and executes the replace only after confirmation.
-
-### Repository structure
-
-```text
-predictfun-trading-module/
-  README.md
-  QUICKSTART.md
-  SECURITY.md
-  PUBLISHING_NOTES.md
-  docs/
-  examples/
-  scripts/
+```env
+PREDICTFUN_API_KEY=
+PREDICTFUN_WALLET_ADDRESS=
+PREDICTFUN_PRIVATE_KEY=
 ```
 
-### Read these files first
+What they mean:
+- `PREDICTFUN_API_KEY` – PredictFun API key for API access
+- `PREDICTFUN_WALLET_ADDRESS` – wallet or account address used by the module
+- `PREDICTFUN_PRIVATE_KEY` – private key used to sign actions
 
-- `QUICKSTART.md` – quick start guide
-- `SECURITY.md` – what must remain private
-- `docs/PREDICTFUN_OPERATIONS.md` – full runtime logic and output behavior
-- `docs/PREDICTFUN_ARCHITECTURE.md` – architecture and module layers
-- `examples/predictfun.env.example` – env template
-- `examples/runtime-layout.md` – suggested local folder layout
+Backward-compatible technical aliases are also supported:
+- `PREDICTFUN_ACCOUNT_ADDRESS`
+- `PREDICTFUN_PRIVY_PRIVATE_KEY`
 
-### Important technical note
+### Security note
 
-The correct cancel path for the Predict account is:
+Never post these values in chat, never commit them to GitHub, and never store them in public files.
+
+They must only exist locally on the user’s own machine.
+
+### First run logic
+
+After installation, the expected user flow is the following.
+
+1. The module uses the prepared default markets.
+2. The system asks the user to specify a budget.
+3. It places buy orders according to the chosen logic.
+4. It moves into monitoring mode.
+5. If needed, it proposes replacements and asks for confirmation.
+6. After a filled buy, it switches into sell monitoring.
+7. After a filled sale, it asks whether to place orders again.
+
+### Workflow examples
+
+#### Step 1. Place orders
+
+Example command:
+
+```text
+Place orders for market: MetaMask
+Dates:
+• June 30, 2026
+• September 30, 2026
+For each date:
+• Yes $1
+• No $1
+```
+
+Example notification:
+
+```text
+MetaMask – June 30, 2026
+• market: Yes 12.3¢, No 87.8¢, spread 0.1¢
+• your orders: Yes 9.3¢, No 84.8¢
+❗️What to do:
+Yes – ✅ placed
+No – ✅ placed
+```
+
+#### Step 2. Monitoring and replace confirmation
+
+```text
+MetaMask – June 30, 2026
+• market: Yes 13.8¢, No 86.3¢, spread 0.2¢
+• your orders: Yes 9.3¢, No 84.8¢
+❗️What to do:
+Yes – ♻️ move to 10.8¢
+No – ✅ no changes
+
+Confirm replacement?
+```
+
+#### Step 3. Buy filled
+
+```text
+MetaMask – June 30, 2026
+• market: Yes 13.8¢, No 86.3¢, spread 0.2¢
+• your orders: Yes – filled, No 84.8¢
+❗️What to do:
+Yes – ✅ buy filled
+No – ⏸️ pause
+
+Switching to SELL_HOLD_MODE
+```
+
+#### Step 4. Sell watch
+
+```text
+MetaMask – June 30, 2026
+• market: Yes 22.4¢, No 77.7¢, spread 0.1¢
+• your orders: Sell Yes 29.0¢
+❗️What to do:
+Sell – 👀 watching
+No – ⏸️ pause
+```
+
+#### Step 5. Sale completed
+
+```text
+MetaMask – June 30, 2026
+• market: Yes 29.1¢, No 70.9¢, spread 0.1¢
+• your orders: Sell Yes – filled
+❗️What to do:
+Sell – ✅ sold
+Send: place orders again
+```
+
+#### Step 6. Cancel all buy orders
+
+```text
+Done. All buy orders cancelled.
+
+• cancelled: 5 orders
+• status: ✅ success
+```
+
+### Screenshots and workflow examples
+
+Screenshots can be added as a visual companion to the workflow above.
+
+Recommended structure:
+- command to place orders;
+- result notification;
+- monitoring and replace confirmation;
+- buy filled and `SELL_HOLD_MODE`;
+- sell watch;
+- sale completed.
+
+Recommended rule:
+- one screenshot per workflow step;
+- short caption under each image;
+- no secrets, wallet-sensitive data, API keys, chat ids, or private infrastructure details.
+
+### Read these files next
+
+- `QUICKSTART.md`
+- `SECURITY.md`
+- `docs/PREDICTFUN_OPERATIONS.md`
+- `docs/PREDICTFUN_ARCHITECTURE.md`
+- `docs/PREDICTFUN_TARGET_MARKETS.json`
+- `examples/predictfun.env.example`
+
+### Technical note
+
+The correct cancel path for Predict accounts is:
 
 - `POST /v1/orders/remove`
 
 Do not assume SDK `cancelOrders()` matches real production behavior.
 
-### Status
-
-This repository is a sanitized public package. Real credentials, live environment files, JWT tokens, cookies, and operational secrets are intentionally excluded.
-
 ---
 
 ## Русский
 
-Полуавтоматический модуль для торговли на PredictFun с мониторингом приватных ордеров, режимом `SELL_HOLD_MODE`, подтверждаемым исполнением действий и фиксированным форматом рабочих уведомлений.
+Полуавтоматический модуль PredictFun с подтверждаемым исполнением, почасовым мониторингом, 10-минутными trigger-проверками, наблюдением за продажей и фиксированным форматом рабочих уведомлений.
 
-### Что это за репозиторий
+### Что находится в репозитории
 
-Это публично подготовленная версия реального рабочего модуля для сценариев PredictFun. Логика сделана для пользователя, которому нужна полезная автоматизация, но без передачи боту полной свободы в торговых действиях.
+Это публично подготовленная версия реального рабочего сценария PredictFun.
+
+Модуль сделан для пользователя, которому нужна полезная автоматизация, но без передачи боту полной свободы в торговых действиях.
 
 Модуль умеет:
+- выставлять buy-ордера по подготовленным рынкам;
 - следить за приватными открытыми ордерами;
-- определять исполнение и переходить в `SELL_HOLD_MODE`;
-- отправлять одно pause-уведомление и не спамить дальше;
+- присылать почасовые полные отчёты;
+- каждые 10 минут проверять срочные сигналы;
+- предлагать перестановку при движении рынка;
+- спрашивать подтверждение перед replace;
+- после исполнения buy-ордера переходить в `SELL_HOLD_MODE`;
 - отслеживать активный sell-ордер;
-- готовить новые buy-ордера `Yes + No`;
-- предлагать перестановку ордеров при движении рынка;
-- исполнять выставление или replace только после явного подтверждения пользователя.
+- сообщать об исполнении продажи;
+- после продажи запускать новый цикл по команде пользователя.
 
-### Основные принципы
+### Базовые рынки в комплекте
 
-- Мониторинг может работать автоматически.
-- Торговые действия остаются только через подтверждение.
-- Выставление buy-ордеров, replace и cleanup не выполняются без явного согласия.
-- После залива модуль корректно уходит в паузу и не создаёт шум.
-- Активный sell-ордер не затрагивается при очистке buy-части.
+В репозитории уже есть подготовленный набор рынков:
+- OpenSea
+- Base
+- MetaMask
 
-### Что уже подтверждено тестами
+Пользователь может сначала работать с этим набором, а позже добавить свои рынки.
 
-В рабочем контуре уже были подтверждены следующие сценарии:
-- выставление одного buy-ордера;
-- выставление пары `Yes + No`;
-- replace пары `Yes + No` после явного подтверждения;
-- отмена тестовых buy-ордеров;
-- сохранение активного sell-ордера при очистке;
-- использование корректного приватного пути отмены через `POST /v1/orders/remove`.
+См. `docs/PREDICTFUN_TARGET_MARKETS.json`
 
-### Основной рабочий сценарий
+### Что нужно добавить в env
 
-#### 1. Обычный buy-режим
+Пользователь должен добавить в локальный env-файл три значения:
 
-Модуль следит за рынком и приватными открытыми ордерами. Если ордера соответствуют целевым правилам, возвращается `NO_CHANGES`. Если нужна перестановка, модуль формирует предложение и ждёт подтверждения перед исполнением.
-
-#### 2. После исполнения ордера
-
-Модуль переходит в `SELL_HOLD_MODE` и отправляет одно pause-уведомление. После этого не повторяет лишние почасовые сообщения.
-
-#### 3. Активен sell-ордер
-
-Когда пользователь выставляет sell-ордер, модуль это обнаруживает, отправляет уведомление в фиксированном рабочем формате и дальше молча наблюдает.
-
-#### 4. Sell-ордер больше не активен
-
-Когда sell-ордер исчезает из списка открытых ордеров, модуль отправляет короткий статус и ждёт одну из двух команд:
-- `выстави сам`
-- `ордера выставил сам`
-
-#### 5. Replace flow
-
-Если пользователь хочет, чтобы модуль вёл buy-сторону, он может выставлять новые buy-ордера `Yes + No`. Если рынок сдвигается, модуль собирает replace-plan, показывает предложение и исполняет его только после подтверждения.
-
-### Структура репозитория
-
-```text
-predictfun-trading-module/
-  README.md
-  QUICKSTART.md
-  SECURITY.md
-  PUBLISHING_NOTES.md
-  docs/
-  examples/
-  scripts/
+```env
+PREDICTFUN_API_KEY=
+PREDICTFUN_WALLET_ADDRESS=
+PREDICTFUN_PRIVATE_KEY=
 ```
 
-### Что читать в первую очередь
+Что значит каждая переменная:
+- `PREDICTFUN_API_KEY` – API key от PredictFun для доступа к API
+- `PREDICTFUN_WALLET_ADDRESS` – адрес кошелька или аккаунта, с которым работает модуль
+- `PREDICTFUN_PRIVATE_KEY` – приватный ключ для подписи действий
 
-- `QUICKSTART.md` – быстрый старт
-- `SECURITY.md` – что обязательно должно оставаться приватным
-- `docs/PREDICTFUN_OPERATIONS.md` – полная рабочая логика и формат вывода
-- `docs/PREDICTFUN_ARCHITECTURE.md` – архитектура и слои модуля
-- `examples/predictfun.env.example` – пример env-файла
-- `examples/runtime-layout.md` – рекомендуемая локальная структура
+Для совместимости также поддерживаются технические имена:
+- `PREDICTFUN_ACCOUNT_ADDRESS`
+- `PREDICTFUN_PRIVY_PRIVATE_KEY`
 
-### Важное техническое замечание
+### Важное правило безопасности
 
-Для Predict account корректный путь отмены ордеров следующий:
+Эти значения нельзя отправлять в чат, коммитить в GitHub или хранить в публичных файлах.
+
+Они должны находиться только локально на машине пользователя.
+
+### Логика первого запуска
+
+После установки пользовательский сценарий должен быть таким.
+
+1. Модуль использует подготовленные рынки.
+2. Система запрашивает у пользователя бюджет.
+3. Выставляет buy-ордера по выбранной логике.
+4. Переходит в режим мониторинга.
+5. При необходимости предлагает replace и ждёт подтверждения.
+6. После исполнения покупки начинает следить за продажей.
+7. После исполнения продажи просит новое действие.
+
+### Примеры рабочего flow
+
+#### Шаг 1. Выставление ордеров
+
+Пример команды:
+
+```text
+Выстави ордера на Рынок: MetaMask.
+Даты:
+• June 30, 2026
+• September 30, 2026
+На каждую дату:
+• Yes 1$
+• No 1$
+```
+
+Пример уведомления:
+
+```text
+MetaMask – June 30, 2026
+• рынок: Yes 12.3¢, No 87.8¢, spread 0.1¢
+• твои ордера: Yes 9.3¢, No 84.8¢
+❗️Что сделать:
+Yes – ✅ выставлено
+No – ✅ выставлено
+```
+
+#### Шаг 2. Мониторинг и подтверждение перестановки
+
+```text
+MetaMask – June 30, 2026
+• рынок: Yes 13.8¢, No 86.3¢, spread 0.2¢
+• твои ордера: Yes 9.3¢, No 84.8¢
+❗️Что сделать:
+Yes – ♻️ переставить на 10.8¢
+No – ✅ без изменений
+
+Подтверждаешь переставление?
+```
+
+#### Шаг 3. Покупка исполнена
+
+```text
+MetaMask – June 30, 2026
+• рынок: Yes 13.8¢, No 86.3¢, spread 0.2¢
+• твои ордера: Yes – исполнен, No 84.8¢
+❗️Что сделать:
+Yes – ✅ налили
+No – ⏸️ пауза
+
+Переходим в SELL_HOLD_MODE
+```
+
+#### Шаг 4. Наблюдение за продажей
+
+```text
+MetaMask – June 30, 2026
+• рынок: Yes 22.4¢, No 77.7¢, spread 0.1¢
+• твои ордера: Sell Yes 29.0¢
+❗️Что сделать:
+Sell – 👀 наблюдаю
+No – ⏸️ пауза
+```
+
+#### Шаг 5. Продажа исполнена
+
+```text
+MetaMask – June 30, 2026
+• рынок: Yes 29.1¢, No 70.9¢, spread 0.1¢
+• твои ордера: Sell Yes – исполнен
+❗️Что сделать:
+Sell – ✅ продалось
+Напиши: выстави заново ордера
+```
+
+#### Шаг 6. Отмена всех buy-ордеров
+
+```text
+Готово. Все buy-ордера отменены.
+
+• отменено: 5 ордеров
+• статус: ✅ success
+```
+
+### Скриншоты и примеры workflow
+
+Скриншоты можно добавить как визуальное сопровождение к шагам выше.
+
+Рекомендуемая структура:
+- команда на выставление ордеров;
+- итоговое уведомление;
+- мониторинг и подтверждение перестановки;
+- исполнение покупки и `SELL_HOLD_MODE`;
+- наблюдение за продажей;
+- исполнение продажи.
+
+Рекомендуемое правило:
+- один скриншот на один шаг workflow;
+- короткая подпись под каждой картинкой;
+- без секретов, чувствительных wallet-данных, API keys, chat ids и private infrastructure details.
+
+### Что читать дальше
+
+- `QUICKSTART.md`
+- `SECURITY.md`
+- `docs/PREDICTFUN_OPERATIONS.md`
+- `docs/PREDICTFUN_ARCHITECTURE.md`
+- `docs/PREDICTFUN_TARGET_MARKETS.json`
+- `examples/predictfun.env.example`
+
+### Техническое замечание
+
+Для Predict account корректный путь отмены ордеров:
 
 - `POST /v1/orders/remove`
 
 Не стоит полагаться на то, что SDK `cancelOrders()` повторяет реальное прод-поведение один в один.
-
-### Статус
-
-Репозиторий подготовлен как публичный и очищенный пакет. Реальные credentials, рабочие env-файлы, JWT, cookies и иные операционные секреты намеренно не включены.

@@ -23,12 +23,14 @@ const fetchJson = async (url, options = {}) => {
 };
 
 const main = async () => {
-  const signer = new Wallet(vals.PREDICTFUN_PRIVY_PRIVATE_KEY);
-  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: vals.PREDICTFUN_ACCOUNT_ADDRESS});
+  const privateKey = vals.PREDICTFUN_PRIVY_PRIVATE_KEY || vals.PREDICTFUN_PRIVATE_KEY;
+  const accountAddress = vals.PREDICTFUN_ACCOUNT_ADDRESS || vals.PREDICTFUN_WALLET_ADDRESS;
+  const signer = new Wallet(privateKey);
+  const ob = await OrderBuilder.make(ChainId.BnbMainnet, signer, {predictAccount: accountAddress});
   const msgRes = await fetchJson('https://api.predict.fun/v1/auth/message', {headers: {'x-api-key': vals.PREDICTFUN_API_KEY}});
   const message = msgRes?.data?.message;
   const signature = await ob.signPredictAccountMessage(message);
-  const jwtRes = await fetchJson('https://api.predict.fun/v1/auth', {method:'POST',headers:{'Content-Type':'application/json','x-api-key':vals.PREDICTFUN_API_KEY},body:JSON.stringify({signer: vals.PREDICTFUN_ACCOUNT_ADDRESS, message, signature})});
+  const jwtRes = await fetchJson('https://api.predict.fun/v1/auth', {method:'POST',headers:{'Content-Type':'application/json','x-api-key':vals.PREDICTFUN_API_KEY},body:JSON.stringify({signer: accountAddress, message, signature})});
   const jwt = jwtRes?.data?.token;
   const privHeaders = {'Authorization':`Bearer ${jwt}`,'x-api-key':vals.PREDICTFUN_API_KEY,'Content-Type':'application/json','User-Agent':'Mozilla/5.0'};
   const openOrders = (await fetchJson('https://api.predict.fun/v1/orders?status=OPEN&first=100', {headers: privHeaders})).data || [];
